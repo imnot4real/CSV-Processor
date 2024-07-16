@@ -1,17 +1,36 @@
 import argparse
 import csv
+import json
 from collections import defaultdict
+import pandas as pd
 
-def read_csv(file_path):
-    with open(file_path, 'r') as f:
-        reader = csv.DictReader(f)
-        return list(reader)
+def read_file(file_path, file_format):
+    if file_format == 'csv':
+        with open(file_path, 'r') as f:
+            reader = csv.DictReader(f)
+            return list(reader)
+    elif file_format == 'json':
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    elif file_format == 'excel':
+        return pd.read_excel(file_path).to_dict('records')
+    else:
+        raise ValueError(f"Unsupported input format: {file_format}")
 
-def write_csv(file_path, data, fieldnames):
-    with open(file_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(data)
+def write_file(file_path, data, fieldnames, file_format):
+    if file_format == 'csv':
+        with open(file_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+    elif file_format == 'json':
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+    elif file_format == 'excel':
+        df = pd.DataFrame(data)
+        df.to_excel(file_path, index=False)
+    else:
+        raise ValueError(f"Unsupported output format: {file_format}")
 
 def filter_data(data, condition):
     return [row for row in data if eval(condition, None, row)]
@@ -44,9 +63,11 @@ def transform_data(data, transformations):
     return data
 
 def main():
-    parser = argparse.ArgumentParser(description="CSV Processor: Filter, aggregate, and transform CSV data")
-    parser.add_argument("input_file", help="Input CSV file path")
-    parser.add_argument("output_file", help="Output CSV file path")
+    parser = argparse.ArgumentParser(description="Data Processor: Filter, aggregate, and transform data")
+    parser.add_argument("input_file", help="Input file path")
+    parser.add_argument("output_file", help="Output file path")
+    parser.add_argument("--input-format", choices=['csv', 'json', 'excel'], default='csv', help="Input file format")
+    parser.add_argument("--output-format", choices=['csv', 'json', 'excel'], default='csv', help="Output file format")
     parser.add_argument("--filter", help="Filter condition (e.g., 'int(age) > 30')")
     parser.add_argument("--group-by", nargs="+", help="Columns to group by for aggregation")
     parser.add_argument("--agg-column", help="Column to aggregate")
@@ -55,8 +76,8 @@ def main():
 
     args = parser.parse_args()
 
-    # Read input CSV
-    data = read_csv(args.input_file)
+    # Read input file
+    data = read_file(args.input_file, args.input_format)
 
     # Apply filter
     if args.filter:
@@ -71,9 +92,9 @@ def main():
         transformations = dict(t.split('=') for t in args.transform)
         data = transform_data(data, transformations)
 
-    # Write output CSV
-    fieldnames = data[0].keys() if data else []
-    write_csv(args.output_file, data, fieldnames)
+    # Write output file
+    fieldnames = list(data[0].keys()) if data else []
+    write_file(args.output_file, data, fieldnames, args.output_format)
 
     print(f"Processed data written to {args.output_file}")
 
